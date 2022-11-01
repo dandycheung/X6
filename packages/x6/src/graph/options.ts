@@ -130,7 +130,9 @@ export namespace Options {
     /**
      * Prevent the default context menu from being displayed.
      */
-    preventDefaultContextMenu: boolean
+    preventDefaultContextMenu:
+      | boolean
+      | ((this: Graph, { view }: { view: CellView | null }) => boolean)
 
     preventDefaultDblClick: boolean
 
@@ -731,6 +733,7 @@ export namespace Options {
       rubberEdge: false, // next version will set to true
       pointerEvents: 'auto',
       multiple: true,
+      multipleSelectionModifiers: ['ctrl', 'meta'],
       movable: true,
       strict: false,
       useCellGeometry: false,

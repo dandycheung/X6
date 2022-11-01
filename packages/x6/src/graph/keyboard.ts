@@ -106,8 +106,13 @@ export class Keyboard extends Disposable implements IDisablable {
 
   protected isGraphEvent(e: KeyboardEvent) {
     const target = (e.srcElement || e.target) as Element
+    const currentTarget = e.currentTarget as Element
     if (target) {
-      if (target === this.target || target === document.body) {
+      if (
+        target === this.target ||
+        currentTarget === this.target ||
+        target === document.body
+      ) {
         return true
       }
 
@@ -119,8 +124,8 @@ export class Keyboard extends Disposable implements IDisablable {
 
   isInputEvent(e: KeyboardEvent | JQuery.MouseUpEvent) {
     const target = e.target as Element
-    const tagName = target && target.tagName.toLowerCase()
-    return tagName === 'input'
+    const tagName = target?.tagName?.toLowerCase()
+    return ['input', 'textarea'].includes(tagName)
   }
 
   isEnabledForEvent(e: KeyboardEvent) {

@@ -7,6 +7,7 @@
 export const content = `.x6-graph {
   position: relative;
   outline: none;
+  touch-action: none;
 }
 .x6-graph-background,
 .x6-graph-grid,
@@ -820,15 +821,8 @@ export const content = `.x6-graph {
 }
 .x6-widget-snapline-vertical,
 .x6-widget-snapline-horizontal {
-  position: absolute;
-  opacity: 1;
-  pointer-events: none;
-}
-.x6-widget-snapline-horizontal {
-  border-bottom: 1px solid #2ecc71;
-}
-.x6-widget-snapline-vertical {
-  border-right: 1px solid #2ecc71;
+  stroke: #2ecc71;
+  stroke-width: 1px;
 }
 .x6-widget-stencil {
   position: absolute;

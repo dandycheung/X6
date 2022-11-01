@@ -125,19 +125,16 @@ export class Selection extends View<Selection.EventArgs> {
     options,
   }: Collection.EventArgs['node:change:position']) {
     const { showNodeSelectionBox, pointerEvents } = this.options
-    const { ui, selection } = options
-    let allowTranslating = !this.translating
+    const { ui, selection, translateBy, snapped } = options
 
-    /* Scenarios where this method is not called:
-     * 1. ShowNodeSelection is true or ponterEvents is none
-     * 2. Avoid circular calls with the selection tag
-     */
-    allowTranslating =
-      allowTranslating &&
-      (showNodeSelectionBox !== true || pointerEvents === 'none')
-    allowTranslating = allowTranslating && ui && !selection
+    const allowTranslating =
+      (showNodeSelectionBox !== true || pointerEvents === 'none') &&
+      !this.translating &&
+      !selection
 
-    if (allowTranslating) {
+    const translateByUi = ui && translateBy && node.id === translateBy
+
+    if (allowTranslating && (translateByUi || snapped)) {
       this.translating = true
       const current = node.position()
       const previous = node.previous('position')!
@@ -289,6 +286,7 @@ export class Selection extends View<Selection.EventArgs> {
       offsetY: y,
       scrollerX: 0,
       scrollerY: 0,
+      moving: false,
     })
 
     this.delegateDocumentEvents(Private.documentEvents, evt.data)
@@ -893,7 +891,7 @@ export class Selection extends View<Selection.EventArgs> {
       added,
       removed,
       options,
-      selected: this.cells,
+      selected: this.cells.filter((cell) => !!this.graph.getCellById(cell.id)),
     }
     this.trigger('selection:changed', args)
     this.graph.trigger('selection:changed', args)

@@ -1,3 +1,4 @@
+import JQuery from 'jquery'
 import { Util, Config } from '../global'
 import { ArrayExt, FunctionExt, Dom, Vector } from '../util'
 import { Rectangle, Point } from '../geometry'
@@ -463,7 +464,11 @@ export class NodeView<
       portSelectors = portContentSelectors || portLabelSelectors
     }
 
-    Dom.addClass(portElement, 'x6-port')
+    let portClass = 'x6-port'
+    if (port.group) {
+      portClass += ` x6-port-${port.group}`
+    }
+    Dom.addClass(portElement, portClass)
     Dom.addClass(portContentElement, 'x6-port-body')
     Dom.addClass(portLabelElement, 'x6-port-label')
 
@@ -607,6 +612,13 @@ export class NodeView<
   }
 
   notifyMouseUp(e: JQuery.MouseUpEvent, x: number, y: number) {
+    // Problem: super will call stopBatch before event listeners
+    // attached to this **node** run. Those events will not count
+    // towards this batch, despite being triggered by the same UI event.
+    //
+    // This complicates a lot of stuff e.g. history recording.
+    //
+    // See https://github.com/antvis/X6/issues/2421 for background.
     super.onMouseUp(e, x, y)
     this.notify('node:mouseup', this.getEventArgs(e, x, y))
   }
@@ -628,6 +640,12 @@ export class NodeView<
 
   onMouseDown(e: JQuery.MouseDownEvent, x: number, y: number) {
     if (this.isPropagationStopped(e)) {
+      return
+    }
+    // 避免处于foreignObject内部元素触发onMouseDown导致节点被拖拽
+    // 拖拽的时候是以onMouseDown启动的
+    const target = e.target as Element
+    if (Dom.clickable(target) || Dom.isInputElement(target)) {
       return
     }
     this.notifyMouseDown(e, x, y)
@@ -665,6 +683,12 @@ export class NodeView<
     if (action === 'magnet') {
       this.stopMagnetDragging(e, x, y)
     } else {
+      // 避免处于foreignObject内部元素触发onMouseUp导致节点被选中
+      // 选中的时候是以onMouseUp启动的
+      const target = e.target as Element
+      if (Dom.clickable(target) || Dom.isInputElement(target)) {
+        return
+      }
       this.notifyMouseUp(e, x, y)
       if (action === 'move') {
         const meta = data as EventData.Moving
@@ -835,11 +859,17 @@ export class NodeView<
 
     // Picks the node with the highest `z` index
     if (options.frontOnly) {
-      candidates = candidates.slice(-1)
+      if (candidates.length > 0) {
+        const zIndexMap = ArrayExt.groupBy(candidates, 'zIndex')
+        const maxZIndex = ArrayExt.max(Object.keys(zIndexMap))
+        if (maxZIndex) {
+          candidates = zIndexMap[maxZIndex]
+        }
+      }
     }
 
     // Filter the nodes which is invisiable
-    candidates = candidates.filter((candidate) => candidate.visible);
+    candidates = candidates.filter((candidate) => candidate.visible)
 
     let newCandidateView = null
     const prevCandidateView = data.candidateEmbedView
@@ -896,6 +926,7 @@ export class NodeView<
   }
 
   finalizeEmbedding(e: JQuery.MouseUpEvent, data: EventData.MovingTargetNode) {
+    this.graph.startBatch('embedding')
     const cell = data.cell || this.cell
     const graph = data.graph || this.graph
     const view = graph.findViewByCell(cell)
@@ -916,9 +947,8 @@ export class NodeView<
       edge.updateParent({ ui: true })
     })
 
-    const localPoint = graph.snapToGrid(e.clientX, e.clientY)
-
-    if (view) {
+    if (view && candidateView) {
+      const localPoint = graph.snapToGrid(e.clientX, e.clientY)
       view.notify('node:embedded', {
         e,
         cell,
@@ -930,6 +960,7 @@ export class NodeView<
         currentParent: cell.getParent(),
       })
     }
+    this.graph.stopBatch('embedding')
   }
 
   getDelegatedView() {
@@ -972,12 +1003,18 @@ export class NodeView<
       if (graph.options.magnetThreshold <= 0) {
         this.startConnectting(e, magnet, x, y)
       }
-
       this.setEventData<Partial<EventData.Magnet>>(e, {
         action: 'magnet',
       })
       this.stopPropagation(e)
     } else {
+      // 只需要阻止port的冒泡 #2258
+      if (
+        Dom.hasClass(magnet, 'x6-port-body') ||
+        JQuery(magnet).closest('.x6-port-body').length > 0
+      ) {
+        this.stopPropagation(e)
+      }
       this.onMouseDown(e, x, y)
     }
 
